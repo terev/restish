@@ -301,7 +301,7 @@ func getCertFromPkcs11(config *PKCS11Config) func(*tls.CertificateRequestInfo) (
 		}
 	}
 
-	pin := os.Getenv("YBPIN")
+	pin := os.Getenv("PKCS11_PIN")
 	if pin == "" {
 		err := survey.AskOne(&survey.Password{Message: "PIN for your PKCS11 device:"}, &pin)
 		if err == terminal.InterruptErr {
