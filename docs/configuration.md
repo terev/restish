@@ -333,19 +333,36 @@ helper commandline:
   "method": "GET",
   "uri": "http://...",
   "headers": {
-    "content-type": ["…"]
+    "content-type": ["…"],
+    "authorization": ["Bearer <YOUR_TOKEN_HERE>"]
     // …
   },
   "body": "…"
 }
 ```
-
-The same shape is expected on the program's standard output. Two
+The same shape is expected on the program's standard output. Please note that the fields inside `headers` must be in an array. Two
 parameters only will be considered:
 
 - `headers`: Values present will be added to the outbound payload.
-- `uri`: Will replace the destination URL entirely (allowing the
-  addition of query arguments if needed).
+- `uri`: Will replace the destination URL entirely (allowing the addition of query arguments if needed).
+
+Here is a good example of how to use this versatile option. Suppose you've written a script in your favorite language that connects to an Auth server and writes a relatively standard OAuth 2.0 JSON in the following shape:
+
+```json
+{
+  "expires_in": 3600,
+  "access_token": "<access_token>",
+  "refresh_token": "<refresh_token>",
+  "scope": "<scopes>"
+}
+```
+You might find yourself doing this with a lot of APIs because not everyone follows the same OAuth 2.0 conventions (maybe you used `restish` to get this token manually in the first place!). Then, when you need to use this file, you could write a quick one-liner with `jq` to convert this to the appropriate format and feed it into `restish` with a line like this in your `commandline`:
+
+```bash
+jq '{headers: {authorization: ["Bearer " + .access_token]}}' /path/to/auth_token.json
+```
+
+As long as your input writes the appropriate format to the standard output (**very important**), `restish` will modify the outgoing request accordingly.
 
 ### Loading from files or URLs
 
