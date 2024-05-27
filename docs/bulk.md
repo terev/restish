@@ -66,7 +66,7 @@ recent_ratings > 5
 ...............^^^^
 ```
 
-Additionally, you can use the `-f` flag to apply a [Shorthand Query](./shorthand.md#querying) filter to each matched file and print out the result, enabling a quick way to get specific values from a set of matched files:
+Additionally, you can use the `-f` flag to apply a [Shorthand Query](shorthand.md#querying) filter to each matched file and print out the result, enabling a quick way to get specific values from a set of matched files:
 
 ```bash
 # Get the most recent rating of each matched book
@@ -134,7 +134,7 @@ Alias: `i`
 | Param / Option       | Description & Example                                                                                                                                                          |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `URL`                | The URL to list resources<br/>Example: `api.rest.sh/books`                                                                                                                     |
-| `-f`, `--rsh-filter` | Filter the response via [Shorthand Query](./shorthand.md#querying)<br/>Example: `-f 'body.{id, version: last_modified_dt}'`                                                    |
+| `-f`, `--rsh-filter` | Filter the response via [Shorthand Query](shorthand.md#querying)<br/>Example: `-f 'body.{id, version: last_modified_dt}'`                                                    |
 | `--url-template`     | Template string to build URLs from list response items. If a filter is passed, it is processed _before_ rendering the URL template.<br/>Example: `--url-template='/items/{id}` |
 
 #### Automatically recognized fields
@@ -189,7 +189,7 @@ Alias: `ls`
 | Param / Option       | Description & Example                                                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `-m`, `--match`      | Match resources using [mexpr](https://github.com/danielgtaylor/mexpr) expressions<br/>Example: `-m 'rating_average >= 4.8'`           |
-| `-f`, `--rsh-filter` | Filter each resource via [Shorthand Query](./shorthand.md#querying) and print the result<br/>Example: `-f 'recent_ratings[0].rating'` |
+| `-f`, `--rsh-filter` | Filter each resource via [Shorthand Query](shorthand.md#querying) and print the result<br/>Example: `-f 'recent_ratings[0].rating'` |
 
 ?> Match expressions show any resource whose expression result is "truthy" (meaning a non-zero scalar or non-empty map/slice). `false`, `0`, `""`, `[]`, and `{}` are considered "falsey".
 
