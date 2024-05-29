@@ -135,6 +135,7 @@ func open(url string) error {
 	case "windows":
 		cmd = "cmd"
 		args = []string{"/c", "start"}
+		url = encodeUrlWindows(url)
 	case "darwin": // mac, ios
 		cmd = "open"
 	default: // "linux", "freebsd", "openbsd", "netbsd"
@@ -142,6 +143,25 @@ func open(url string) error {
 	}
 	args = append(args, url)
 	return exec.Command(cmd, args...).Start()
+}
+
+// Windows OS need strings to be encoded
+// for proper command line interface handling.
+func encodeUrlWindows(url string) string {
+	// escape '&'
+	sp := strings.Split(url, "&")
+	var escaped string
+	for i, p := range sp {
+		// Skip adding escape at the beginning
+		if i == 0 {
+			escaped += p
+			continue
+		}
+		escaped += "^&" + p
+	}
+
+	// keep protocol
+	return escaped
 }
 
 // getInput waits for user input and sends it to the input channel with the
