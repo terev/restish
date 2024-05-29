@@ -172,7 +172,7 @@ $ restish api.rest.sh -f headers.Date -r
 Sat, 1 Jan 2022 12:00:00 GMT
 ```
 
-See [filtering & projection](output.md#filtering--projection) for more info & examples.
+See [filtering & projection](output.md#filtering-amp-projection) for more info & examples.
 
 ### Output defaults
 

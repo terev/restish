@@ -61,7 +61,7 @@ If neither one of those returns an OpenAPI spec, then the loader gives up.
 
 ### Loading from files
 
-For local testing or an API you don't control or can't update, you can load from OpenAPI files. See [Configuration: Loading from Files](configuration.md#loading-from-files) for an example configuration.
+For local testing or an API you don't control or can't update, you can load from OpenAPI files. See [Configuration: Loading from files or URLs](configuration.md#loading-from-files-or-urls) for an example configuration.;
 
 ## OpenAPI extensions
 
