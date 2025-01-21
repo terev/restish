@@ -68,8 +68,6 @@ func (a APIConfig) Save() error {
 
 // Return colorized string of configuration in JSON or YAML
 func (a APIConfig) GetPrettyDisplay(outFormat string) ([]byte, error) {
-	var prettyConfig []byte
-
 	// marshal
 	if outFormat == "auto" {
 		outFormat = "json"
@@ -79,13 +77,17 @@ func (a APIConfig) GetPrettyDisplay(outFormat string) ([]byte, error) {
 		return nil, errors.New("unable to render configuration")
 	}
 
+	if !useColor {
+		return marshalled, nil
+	}
+
 	// colorize
-	prettyConfig, err = Highlight(outFormat, marshalled)
+	marshalled, err = Highlight(outFormat, marshalled)
 	if err != nil {
 		return nil, errors.New("unable to colorize output")
 	}
 
-	return prettyConfig, nil
+	return marshalled, nil
 }
 
 type apiConfigs map[string]*APIConfig
