@@ -15,13 +15,23 @@ func TestAPIContentTypes(t *testing.T) {
 }
 
 func TestAPIShow(t *testing.T) {
-	reset(false)
-	configs["test"] = &APIConfig{
-		name: "test",
-		Base: "https://api.example.com",
+	for tn, tc := range map[string]struct {
+		color bool
+		want  string
+	}{
+		"no color": {false, "{\n  \"base\": \"https://api.example.com\"\n}\n"},
+		"color":    {true, "\x1b[38;5;247m{\x1b[0m\n  \x1b[38;5;74m\"base\"\x1b[0m\x1b[38;5;247m:\x1b[0m \x1b[38;5;150m\"https://api.example.com\"\x1b[0m\n\x1b[38;5;247m}\x1b[0m\n"},
+	} {
+		t.Run(tn, func(t *testing.T) {
+			reset(tc.color)
+			configs["test"] = &APIConfig{
+				name: "test",
+				Base: "https://api.example.com",
+			}
+			captured := runNoReset("api show test")
+			assert.Equal(t, captured, tc.want)
+		})
 	}
-	captured := runNoReset("api show test")
-	assert.Equal(t, captured, "\x1b[38;5;247m{\x1b[0m\n  \x1b[38;5;74m\"base\"\x1b[0m\x1b[38;5;247m:\x1b[0m \x1b[38;5;150m\"https://api.example.com\"\x1b[0m\n\x1b[38;5;247m}\x1b[0m\n")
 }
 
 func TestAPIClearCache(t *testing.T) {
