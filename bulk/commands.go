@@ -100,7 +100,7 @@ func newInterpreter(expression, schemaURL string) mexpr.Interpreter {
 
 	ast, err := mexpr.Parse(expression, example, mexpr.UnquotedStrings)
 	if err != nil {
-		cli.LogWarning(err.Pretty(expression))
+		cli.LogWarning("%s", err.Pretty(expression))
 		// Just return a falsey value to filter these files out.
 		ast = &mexpr.Node{
 			Type:  mexpr.NodeLiteral,
