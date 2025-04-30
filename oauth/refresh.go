@@ -1,9 +1,7 @@
 package oauth
 
 import (
-	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/danielgtaylor/restish/cli"
 	"golang.org/x/oauth2"
@@ -39,14 +37,21 @@ type RefreshTokenSource struct {
 func (ts *RefreshTokenSource) Token() (*oauth2.Token, error) {
 	if ts.RefreshToken != "" {
 		cli.LogDebug("Trying refresh token to get a new access token")
-		payload := fmt.Sprintf("grant_type=refresh_token&client_id=%s&refresh_token=%s&scope=%s", ts.ClientID, ts.RefreshToken, strings.Join(ts.Scopes, " "))
-
-		params := ts.EndpointParams.Encode()
-		if len(params) > 0 {
-			payload += "&" + params
+		refreshParams := url.Values{
+			"grant_type":    []string{"refresh_token"},
+			"client_id":     []string{ts.ClientID},
+			"refresh_token": []string{ts.RefreshToken},
+			"scope":         ts.Scopes,
 		}
 
-		token, err := requestToken(ts.TokenURL, payload)
+		// Copy any endpoint-specific parameters.
+		if ts.EndpointParams != nil {
+			for k, v := range *ts.EndpointParams {
+				refreshParams[k] = v
+			}
+		}
+
+		token, err := requestToken(ts.TokenURL, refreshParams.Encode())
 		if err == nil {
 			return token, err
 		}
