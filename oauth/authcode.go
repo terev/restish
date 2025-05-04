@@ -373,6 +373,7 @@ func (h *AuthorizationCodeHandler) OnRequest(request *http.Request, key string, 
 		refreshSource := RefreshTokenSource{
 			ClientID:       params["client_id"],
 			TokenURL:       params["token_url"],
+			Scopes:         strings.Split(params["scopes"], ","),
 			EndpointParams: &endpointParams,
 			RefreshToken:   cli.Cache.GetString(refreshKey),
 			TokenSource:    source,
