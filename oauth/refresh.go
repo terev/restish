@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/danielgtaylor/restish/cli"
+	"github.com/rest-sh/restish/cli"
 	"golang.org/x/oauth2"
 )
 
