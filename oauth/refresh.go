@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"net/url"
+	"strings"
 
 	"github.com/danielgtaylor/restish/cli"
 	"golang.org/x/oauth2"
@@ -41,7 +42,7 @@ func (ts *RefreshTokenSource) Token() (*oauth2.Token, error) {
 			"grant_type":    []string{"refresh_token"},
 			"client_id":     []string{ts.ClientID},
 			"refresh_token": []string{ts.RefreshToken},
-			"scope":         ts.Scopes,
+			"scope":         []string{strings.Join(ts.Scopes, " ")},
 		}
 
 		// Copy any endpoint-specific parameters.
