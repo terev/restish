@@ -1,6 +1,7 @@
 package bulk
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,8 +12,6 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/mexpr"
-	"github.com/danielgtaylor/restish/cli"
-	"github.com/danielgtaylor/restish/openapi"
 	"github.com/danielgtaylor/shorthand/v2"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
@@ -25,6 +24,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
+
+	"github.com/danielgtaylor/restish/cli"
+	"github.com/danielgtaylor/restish/openapi"
 )
 
 var afs afero.Fs = afero.NewOsFs()
@@ -85,7 +87,7 @@ func newInterpreter(expression, schemaURL string) mexpr.Interpreter {
 
 				if err := yaml.Unmarshal(body, &rootNode); err == nil {
 					if err := low.BuildModel(rootNode.Content[0], &ls); err == nil {
-						if err := ls.Build(rootNode.Content[0], index.NewSpecIndex(&rootNode)); err == nil {
+						if err := ls.Build(context.TODO(), rootNode.Content[0], index.NewSpecIndex(&rootNode)); err == nil {
 							s := base.NewSchema(&ls)
 							result := openapi.GenExample(s, 0)
 							if asMap, ok := result.(map[string]any); ok {
