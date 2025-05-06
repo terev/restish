@@ -2,11 +2,11 @@ package openapi
 
 import (
 	"log"
+	"maps"
 	"strings"
 
 	"github.com/lucasjones/reggen"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"golang.org/x/exp/maps"
 )
 
 // GenExample creates a dummy example from a given schema.

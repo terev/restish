@@ -20,13 +20,12 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/low"
 	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 	"github.com/pb33f/libopenapi/index"
+	"github.com/rest-sh/restish/cli"
+	"github.com/rest-sh/restish/openapi"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
-
-	"github.com/danielgtaylor/restish/cli"
-	"github.com/danielgtaylor/restish/openapi"
 )
 
 var afs afero.Fs = afero.NewOsFs()

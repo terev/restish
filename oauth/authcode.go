@@ -16,8 +16,8 @@ import (
 
 	"context"
 
-	"github.com/danielgtaylor/restish/cli"
 	"github.com/mattn/go-isatty"
+	"github.com/rest-sh/restish/cli"
 	"golang.org/x/oauth2"
 )
 
@@ -373,6 +373,7 @@ func (h *AuthorizationCodeHandler) OnRequest(request *http.Request, key string, 
 		refreshSource := RefreshTokenSource{
 			ClientID:       params["client_id"],
 			TokenURL:       params["token_url"],
+			Scopes:         strings.Split(params["scopes"], ","),
 			EndpointParams: &endpointParams,
 			RefreshToken:   cli.Cache.GetString(refreshKey),
 			TokenSource:    source,
