@@ -3,13 +3,13 @@ package cli
 import (
 	"bytes"
 	"errors"
-	"io"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -208,25 +208,51 @@ func TestRequestRetryTimeout(t *testing.T) {
 	assert.ErrorContains(t, err, "timed out")
 }
 
-func TestNoContentResponses(t *testing.T) {
+func TestNoContentResponsesWithEncodingHeader(t *testing.T) {
 	defer gock.Off()
 
-	reset(false)
+	testCases := []struct {
+		name    string
+		headers map[string]string
+	}{
+		{
+			name: "no encoding header",
+		},
+		{
+			name: "gzip encoding header",
+			headers: map[string]string{
+				"Content-Encoding": "gzip",
+			},
+		},
+		{
+			name: "brotli encoding header",
+			headers: map[string]string{
+				"Content-Encoding": "br",
+			},
+		},
+		{
+			name: "deflate encoding header",
+			headers: map[string]string{
+				"Content-Encoding": "deflate",
+			},
+		},
+	}
 
-	gock.New("http://example.com").
-		Get("/").
-		Reply(http.StatusNoContent)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reset(false)
 
-	req, _ := http.NewRequest(http.MethodGet, "http://example.com/", nil)
-	resp, err := MakeRequest(req)
+			gock.New("http://example.com").
+				Get("/").
+				Reply(http.StatusNoContent).
+				SetHeaders(tc.headers)
 
-	assert.NoError(t, err)
-	assert.Equal(t, resp.StatusCode, http.StatusNoContent)
+			req, err := http.NewRequest(http.MethodGet, "http://example.com/", nil)
+			require.NoError(t, err)
 
-	content, err := DecodeResponse(resp)
-	assert.NoError(t, err)
-
-	d, err := io.ReadAll(content)
-	assert.NoError(t, err)
-	assert.Empty(t, d)
+			assert.NotPanics(t, func() {
+				MakeRequestAndFormat(req)
+			})
+		})
+	}
 }

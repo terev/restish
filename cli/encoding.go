@@ -39,7 +39,11 @@ func buildAcceptEncodingHeader() string {
 // Assumes the original body will be closed outside of this function.
 func DecodeResponse(resp *http.Response) (io.Reader, error) {
 	contentEncoding := resp.Header.Get("content-encoding")
-	if resp.Uncompressed || contentEncoding == "" {
+
+	// The net/http package handles decompressing responses in some cases.
+	// When it does, it deletes the content-encoding and content-length headers.
+	// This handles pre-decoded and non-encoded responses.
+	if contentEncoding == "" {
 		return resp.Body, nil
 	}
 
