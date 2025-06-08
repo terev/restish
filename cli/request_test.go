@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func TestRequestPagination(t *testing.T) {
 	assert.Equal(t, resp.Status, http.StatusOK)
 
 	// Content length should be the sum of all combined.
-	assert.Equal(t, resp.Headers["Content-Length"], "15")
+	assert.Equal(t, "15", resp.Headers["Content-Length"])
 
 	// Response body should be a concatenation of all pages.
 	assert.Equal(t, []interface{}{1.0, 2.0, 3.0, 4.0, 5.0, 6.0}, resp.Body)
@@ -197,12 +198,35 @@ func TestRequestRetryTimeout(t *testing.T) {
 		Times(2).
 		Reply(http.StatusOK).
 		Delay(2 * time.Millisecond)
-		// Note: delay seems to have a bug where subsequent requests without the
-		// delay are still delayed... For now just have it reply twice.
+	// Note: delay seems to have a bug where subsequent requests without the
+	// delay are still delayed... For now just have it reply twice.
 
 	req, _ := http.NewRequest(http.MethodGet, "http://example.com/", nil)
 	_, err := MakeRequest(req)
 
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "timed out")
+}
+
+func TestNoContentResponses(t *testing.T) {
+	defer gock.Off()
+
+	reset(false)
+
+	gock.New("http://example.com").
+		Get("/").
+		Reply(http.StatusNoContent)
+
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com/", nil)
+	resp, err := MakeRequest(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, resp.StatusCode, http.StatusNoContent)
+
+	content, err := DecodeResponse(resp)
+	assert.NoError(t, err)
+
+	d, err := io.ReadAll(content)
+	assert.NoError(t, err)
+	assert.Empty(t, d)
 }

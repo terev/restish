@@ -35,32 +35,28 @@ func buildAcceptEncodingHeader() string {
 	return strings.Join(accept, ", ")
 }
 
-// DecodeResponse will replace the response body with a decoding reader if needed.
+// DecodeResponse will return a reader to decode the response body based on the encoding.
 // Assumes the original body will be closed outside of this function.
-func DecodeResponse(resp *http.Response) error {
+func DecodeResponse(resp *http.Response) (io.Reader, error) {
 	contentEncoding := resp.Header.Get("content-encoding")
-
-	if contentEncoding == "" {
-		// Nothing to do!
-		return nil
+	if resp.Uncompressed || contentEncoding == "" {
+		return resp.Body, nil
 	}
 
 	encoding := encodings[contentEncoding]
 
 	if encoding == nil {
-		return fmt.Errorf("unsupported content-encoding %s", contentEncoding)
+		return nil, fmt.Errorf("unsupported content-encoding %s", contentEncoding)
 	}
 
 	LogDebug("Decoding response from %s", contentEncoding)
 
 	reader, err := encoding.Reader(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	resp.Body = io.NopCloser(reader)
-
-	return nil
+	return reader, nil
 }
 
 // DeflateEncoding supports gzip-encoded response content.
