@@ -2,10 +2,12 @@ package oauth
 
 import (
 	"bufio"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
+	"cmp"
+	"context"
+	"crypto/subtle"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,12 +16,13 @@ import (
 	"strings"
 	"time"
 
-	"context"
-
 	"github.com/mattn/go-isatty"
-	"github.com/rest-sh/restish/cli"
 	"golang.org/x/oauth2"
+
+	"github.com/rest-sh/restish/cli"
 )
+
+const DefaultRedirectURL = "http://localhost:8484"
 
 var htmlSuccess = `
 <html>
@@ -179,10 +182,16 @@ func getInput(input chan string) {
 // authHandler is an HTTP handler that takes a channel and sends the `code`
 // query param when it gets a request.
 type authHandler struct {
-	c chan string
+	state string
+	c     chan string
 }
 
-func (h authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h authHandler) Callback(w http.ResponseWriter, r *http.Request) {
+	if state := r.URL.Query().Get("state"); subtle.ConstantTimeCompare([]byte(state), []byte(h.state)) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html")
 
 	if err := r.URL.Query().Get("error"); err != "" {
@@ -205,90 +214,60 @@ func (h authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // to fetch an auth token (and refresh token). That token is then in turn
 // used to make requests against the API.
 type AuthorizationCodeTokenSource struct {
-	ClientID       string
-	ClientSecret   string
-	AuthorizeURL   string
-	TokenURL       string
-	RedirectURL    string
-	EndpointParams *url.Values
-	Scopes         []string
-}
-
-func (ac *AuthorizationCodeTokenSource) getRedirectUrl() string {
-	if ac.RedirectURL == "" {
-		return "http://localhost:8484"
-	}
-
-	return ac.RedirectURL
+	OAuth2Config *oauth2.Config
 }
 
 // Token generates a new token using an authorization code.
 func (ac *AuthorizationCodeTokenSource) Token() (*oauth2.Token, error) {
-	// Generate a random code verifier string
-	verifierBytes := make([]byte, 32)
-	if _, err := rand.Read(verifierBytes); err != nil {
-		return nil, err
-	}
-
-	verifier := base64.RawURLEncoding.EncodeToString(verifierBytes)
-
-	// Generate a code challenge. Only the challenge is sent when requesting a
-	// code which allows us to keep it secret for now.
-	shaBytes := sha256.Sum256([]byte(verifier))
-	challenge := base64.RawURLEncoding.EncodeToString(shaBytes[:])
+	verifier := oauth2.GenerateVerifier()
+	state := oauth2.GenerateVerifier()
 
 	// Generate a URL with the challenge to have the user log in.
-	authorizeURL, err := url.Parse(ac.AuthorizeURL)
-	if err != nil {
-		panic(err)
-	}
-
-	aq := authorizeURL.Query()
-	aq.Set("response_type", "code")
-	aq.Set("code_challenge", challenge)
-	aq.Set("code_challenge_method", "S256")
-	aq.Set("client_id", ac.ClientID)
-	aq.Set("redirect_uri", ac.getRedirectUrl())
-	aq.Set("scope", strings.Join(ac.Scopes, " "))
-	if ac.EndpointParams != nil {
-		for k, v := range *ac.EndpointParams {
-			aq.Set(k, v[0])
-		}
-	}
-	authorizeURL.RawQuery = aq.Encode()
+	authorizeURL := ac.OAuth2Config.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier))
 
 	// Run server before opening the user's browser so we are ready for any redirect.
 	codeChan := make(chan string)
 	handler := authHandler{
-		c: codeChan,
+		state: state,
+		c:     codeChan,
 	}
 
 	// strip protocol prefix from configured redirect url for local webserver
-	u, err := url.Parse(ac.getRedirectUrl())
+	redirectURL, err := url.Parse(ac.OAuth2Config.RedirectURL)
 	if err != nil {
 		panic(err)
 	}
-	redirectServer := fmt.Sprintf("%s:%s", u.Hostname(), u.Port())
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET "+redirectURL.Path, handler.Callback)
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
 
 	s := &http.Server{
-		Addr:           redirectServer,
-		Handler:        handler,
+		Handler:        mux,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   5 * time.Second,
 		MaxHeaderBytes: 1024,
 	}
 
+	// Start listener in this goroutine to ensure it's started before showing the user the auth url.
+	listener, err := net.Listen("tcp", redirectURL.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start callback server: %w", err)
+	}
+
 	go func() {
-		// Run in a goroutine until the server is closed or we get an error.
-		if err := s.ListenAndServe(); err != http.ErrServerClosed {
-			panic(err)
+		// Run in a goroutine until the server is closed, or we get an error.
+		if err := s.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+			panic(fmt.Errorf("callback server encountered unexpected error: %w", err))
 		}
 	}()
 
 	// Open auth URL in browser, print for manual use in case open fails.
 	fmt.Fprintln(os.Stderr, "Open your browser to log in using the URL:")
-	fmt.Fprintln(os.Stderr, authorizeURL.String())
-	open(authorizeURL.String())
+	fmt.Fprintln(os.Stderr, authorizeURL)
+	open(authorizeURL)
 
 	// Provide a way to manually enter the code, e.g. for remote SSH sessions.
 	// Only read from stdin if it is a live terminal, if a file or command has
@@ -315,17 +294,11 @@ func (ac *AuthorizationCodeTokenSource) Token() (*oauth2.Token, error) {
 		os.Exit(1)
 	}
 
-	payload := url.Values{}
-	payload.Set("grant_type", "authorization_code")
-	payload.Set("client_id", ac.ClientID)
-	payload.Set("code_verifier", verifier)
-	payload.Set("code", code)
-	payload.Set("redirect_uri", ac.getRedirectUrl())
-	if ac.ClientSecret != "" {
-		payload.Set("client_secret", ac.ClientSecret)
+	token, err := ac.OAuth2Config.Exchange(context.Background(), code, oauth2.VerifierOption(verifier))
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
 	}
-
-	return requestToken(ac.TokenURL, payload.Encode())
+	return token, nil
 }
 
 // AuthorizationCodeHandler sets up the OAuth 2.0 authorization code with PKCE authentication
@@ -346,41 +319,54 @@ func (h *AuthorizationCodeHandler) Parameters() []cli.AuthParam {
 
 // OnRequest gets run before the request goes out on the wire.
 func (h *AuthorizationCodeHandler) OnRequest(request *http.Request, key string, params map[string]string) error {
-	if request.Header.Get("Authorization") == "" {
-		endpointParams := url.Values{}
-		for k, v := range params {
-			if k == "client_id" || k == "client_secret" || k == "scopes" || k == "authorize_url" || k == "token_url" || k == "redirect_url" {
-				// Not a custom param...
-				continue
-			}
-
-			endpointParams.Add(k, v)
-		}
-
-		source := &AuthorizationCodeTokenSource{
-			ClientID:       params["client_id"],
-			ClientSecret:   params["client_secret"],
-			AuthorizeURL:   params["authorize_url"],
-			TokenURL:       params["token_url"],
-			RedirectURL:    params["redirect_url"],
-			EndpointParams: &endpointParams,
-			Scopes:         strings.Split(params["scopes"], ","),
-		}
-
-		// Try to get a cached refresh token from the current profile and use
-		// it to wrap the auth code token source with a refreshing source.
-		refreshKey := key + ".refresh"
-		refreshSource := RefreshTokenSource{
-			ClientID:       params["client_id"],
-			TokenURL:       params["token_url"],
-			Scopes:         strings.Split(params["scopes"], ","),
-			EndpointParams: &endpointParams,
-			RefreshToken:   cli.Cache.GetString(refreshKey),
-			TokenSource:    source,
-		}
-
-		return TokenHandler(&refreshSource, key, request)
+	if request.Header.Get("Authorization") != "" {
+		return nil
 	}
 
-	return nil
+	authorizeURL, err := url.Parse(params["authorize_url"])
+	if err != nil {
+		return fmt.Errorf("invalid authorize_url %q: %w", params["token_url"], err)
+	}
+
+	tokenURL, err := url.Parse(params["token_url"])
+	if err != nil {
+		return fmt.Errorf("invalid token_url %q: %w", params["token_url"], err)
+	}
+
+	tokenQuery := tokenURL.Query()
+	authorizeQuery := authorizeURL.Query()
+	for k, v := range params {
+		if k == "client_id" || k == "client_secret" || k == "scopes" || k == "authorize_url" || k == "token_url" || k == "redirect_url" {
+			// Not a custom param...
+			continue
+		}
+
+		tokenQuery.Add(k, v)
+		authorizeQuery.Add(k, v)
+	}
+
+	tokenURL.RawQuery = tokenQuery.Encode()
+	authorizeURL.RawQuery = authorizeQuery.Encode()
+
+	oauth2Conf := &oauth2.Config{
+		ClientID:     params["client_id"],
+		ClientSecret: params["client_secret"],
+		RedirectURL:  cmp.Or(params["redirect_url"], DefaultRedirectURL),
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  authorizeURL.String(),
+			TokenURL: tokenURL.String(),
+		},
+		Scopes: strings.Split(params["scopes"], ","),
+	}
+
+	cachedToken := readTokenFromCache(key)
+	var initialSource oauth2.TokenSource
+	if cachedToken != nil {
+		initialSource = oauth2Conf.TokenSource(context.Background(), cachedToken)
+	}
+
+	return TokenHandler(&RefreshableAuthorizationCodeTokenSource{
+		OAuth2Conf:  oauth2Conf,
+		TokenSource: initialSource,
+	}, key, request)
 }
